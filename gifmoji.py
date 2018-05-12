@@ -119,9 +119,10 @@ def main(args):
         cx,cy = pos[i,:]
         target_block = get_img_block(Y, (cx,cy), (sx,sy))
 
-        # current score
-        cur_block = get_img_block(Image_to_array(Image_rgba_to_rgb(Yh)), (cx,cy), (sx,sy))
-        null_score = fitness(cur_block, target_block)
+        # get current score
+        if not args.force_add:
+            cur_block = get_img_block(Image_to_array(Image_rgba_to_rgb(Yh)), (cx,cy), (sx,sy))
+            null_score = fitness(cur_block, target_block)
 
         # find best emoji for current 32x32 target block
         scores = [fitness(blk, target_block) for blk in emoji_blocks]
@@ -131,7 +132,7 @@ def main(args):
         if args.force_add or scores[j] > null_score:
             Yh.paste(emojis[j], (cx,cy), emojis[j])
             if not args.silent and i % args.log_every == 0:
-                print("Iter #{}, Emoji #{}, Score: {:0.2f}".format(i, j, null_score))
+                print("Iter #{}, Emoji #{}, Score: {:0.2f}".format(i, j, scores[j]))
         else:
             if not args.silent and i % args.log_every == 0:
                 print("Iter #{}, Emoji #{}, Score: {:0.2f}".format(i, np.nan, null_score))
@@ -177,6 +178,7 @@ if __name__ == '__main__':
             args.run_name = run_name + '-{:02d}'.format(i)
             print(args.targetfile, args.run_name)
             main(args)
+        # now, combine .pngs into a single .gif:
+        # convert -dispose previous -delay 1 *.png out.gif
     else:
         main(args)
-    # convert -dispose previous -delay 1 *.png out.gif
