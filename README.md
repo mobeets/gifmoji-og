@@ -2,7 +2,7 @@ Turns images or gifs into emojis.
 
 The way it works is to repeatedly sample random 32x32 segments of a target image, and for each segment it selects the best emoji to go in that location.
 
-The "best" emoji is chosen based on Euclidean distance in pixel space. For example, in a given 32x32 segment of the target image, treat the pixel values as a 32*32*3-dimensional vector, and pick the emoji (which is also a 32*32*3-d vector) such that the L2 norm between the two vectors is smallest.
+The "best" emoji is chosen based on Euclidean distance in pixel space. For example, in a given 32x32 segment of the target image, it treats the pixel values as a 32*32*3-dimensional vector, and picks the emoji (each of which is also a 32*32*3-d vector) such that the L2 norm between the two vectors is smallest.
 
 ## Examples
 
