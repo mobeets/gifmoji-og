@@ -4,6 +4,8 @@ import numpy as np
 from skimage.util.shape import view_as_blocks
 from scipy.misc import imread
 from PIL import Image
+from scipy.spatial import distance
+EMOJI_SIZE = 32
 
 def array_to_Image(img):
     return Image.fromarray(np.swapaxes(img, 0, 1))
@@ -26,9 +28,9 @@ def Image_rgba_to_rgb(image, color=(255, 255, 255)):
 
 def load_emojis(infile='images/emojis.png', upsample=1.0):
     img = imread(infile, mode='RGBA')
-    B = view_as_blocks(img, block_shape=(32, 32, 4))
+    B = view_as_blocks(img, block_shape=(EMOJI_SIZE, EMOJI_SIZE, 4))
     B = B[:,:,0,:,:,:]
-    C = np.reshape(B, (B.shape[0]*B.shape[1], 32, 32, 4))
+    C = np.reshape(B, (B.shape[0]*B.shape[1], EMOJI_SIZE, EMOJI_SIZE, 4))
     return [Image.fromarray(c).resize((int(upsample*c.shape[0]), int(upsample*c.shape[1]))) for c in C]
 
 def load_target(infile='images/trump.png', upsample=1.0):
@@ -89,6 +91,57 @@ def rescore(Y, Yc):
 # TRUMP_INDS = [891, 893, 863, 834, 802, 804, 773, 764, 743, 740, 736, 713, 712, 706, 684, 683, 653, 616, 593, 563, 556, 536, 465, 439, 405, 375, 354, 334, 323, 293, 294, 291, 264, 263, 234, 233, 225, 203, 204, 195, 173, 148, 118, 114, 107, 106, 90, 86, 73, 54, 47, 42, 33, 21]
 # emojis = [e for i,e in enumerate(emojis) if i in TRUMP_INDS]
 
+def emoji_encode(img):
+    Yc = 1.0*np.array(Image_rgba_to_rgb(img))
+    return np.reshape(Yc, (EMOJI_SIZE*EMOJI_SIZE, -1)).mean(axis=0)
+
+def main_fast(args):
+    """
+    if we just want a perfect grid of emojis, we can use this
+
+    here, we just compare based on average color of each block
+    """
+    # load target image, extract segments of image
+    Y = load_target(args.targetfile, upsample=args.target_upsample)
+    wx = EMOJI_SIZE*(Y.shape[0]/EMOJI_SIZE)
+    wy = EMOJI_SIZE*(Y.shape[1]/EMOJI_SIZE)
+    Y = Y[:wx,:wy,:].transpose(1,0,2)
+    Ys = view_as_blocks(Y, block_shape=(EMOJI_SIZE,EMOJI_SIZE,3))
+
+    # find mean color of each block
+    pts = Ys[:,:,0,:,:,:]
+    pts = pts.transpose(0,1,-1,2,3)
+    pts = np.reshape(pts, pts.shape[:-2] + (-1,))
+    clrs = np.mean(pts, axis=-1) # w x h x 3
+    clrs = np.reshape(clrs.transpose(-1,0,1), (3, -1)).T # w*h x 3
+
+    # load emojis, and find mean color of each emoji
+    emojis = load_emojis(args.emojifile, upsample=args.unit_upsample)
+    emojis = [1.0*np.array(Image_rgba_to_rgb(img)) for img in emojis]
+    emojis = np.array(emojis)
+    emojis = emojis.transpose(0,-1,1,2)
+    eclrs = np.reshape(emojis, emojis.shape[:2] + (-1,))
+    eclrs = np.mean(eclrs, axis=-1)
+
+    # find closest emoji in terms of color
+    dists = distance.cdist(clrs, eclrs, 'euclidean')
+    inds = np.argmin(dists, axis=-1)
+    indsb = inds.reshape(pts.shape[0], pts.shape[1])
+
+    # combine emojis to create final image
+    E = emojis[indsb]
+    E = E.transpose(0,1,3,4,2)
+    Es = [E[:,:,:,:,i] for i in range(3)]
+    Es2 = [B.transpose(0,2,1,3).reshape(-1,B.shape[1]*B.shape[3]) for B in Es]
+    E2 = np.dstack(Es2).astype(np.uint8)
+    img = Image.fromarray(E2, 'RGB')
+
+    # save image
+    outfile = os.path.join(args.outdir, args.run_name + '.png')
+    if not os.path.exists(args.outdir):
+        os.mkdir(args.outdir)
+    img.save(outfile)
+
 def main(args):
     emojis = load_emojis(args.emojifile, upsample=args.unit_upsample)
 
@@ -117,7 +170,7 @@ def main(args):
     for i in range(len(pos)):
         # pick next location
         cx,cy = pos[i,:]
-        target_block = get_img_block(Y, (cx,cy), (sx,sy))
+        target_block = get_img_block(Y, (cx,cy), (sx,sy))        
 
         # get current score
         if not args.force_add:
@@ -145,11 +198,12 @@ if __name__ == '__main__':
     parser.add_argument('run_name', type=str,
         help='tag for current run')
     parser.add_argument('--targetfile', type=str,
-        default='images/elaine.png')
+        default='images/trump.png')
     parser.add_argument('--emojifile', type=str,
         default='images/emojis.png')
     parser.add_argument('--force_add', action='store_true')
     parser.add_argument('--no_grid', action='store_true')
+    parser.add_argument('--do_fast', action='store_true')
     parser.add_argument('--silent', action='store_true')
     parser.add_argument('--gif_partial_mode', action='store_true',
         help="set if gif is in partial mode")
@@ -177,8 +231,14 @@ if __name__ == '__main__':
             args.targetfile = outfile
             args.run_name = run_name + '-{:02d}'.format(i)
             print(args.targetfile, args.run_name)
-            main(args)
+            if args.do_fast:
+                main_fast(args)
+            else:
+                main(args)
         # now, combine .pngs into a single .gif:
         # convert -dispose previous -delay 1 *.png out.gif
     else:
-        main(args)
+        if args.do_fast:
+            main_fast(args)
+        else:
+            main(args)
