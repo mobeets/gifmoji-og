@@ -178,12 +178,4 @@ if __name__ == '__main__':
             main(args)
     else:
         main(args)
-
-    # args.outdir = 'images/kaleid/out'
-    # args.force_add = True
-    # args.target_upsample = 3
-    # for j in range(24):
-    #     args.targetfile = 'images/kaleid/kaleid-{}.png'.format(j)
-    #     args.run_name = 'kaleid-{:02d}'.format(j)
-    #     main(args)
     # convert -dispose previous -delay 1 *.png out.gif
