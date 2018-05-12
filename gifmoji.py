@@ -87,6 +87,8 @@ def rescore(Y, Yc):
 
 TRUMP_INDS = [17, 21, 24, 42, 47, 54, 61, 65, 67, 73, 84, 86, 90, 93, 101, 106, 107, 110, 114, 115, 118, 134, 138, 140, 143, 144, 148, 155, 165, 169, 170, 173, 177, 195, 197, 204, 205, 225, 233, 234, 243, 263, 287, 293, 294, 323, 334, 354, 375, 405, 465, 472, 476, 536, 556, 592, 593, 616, 623, 653, 683, 684, 706, 712, 713, 736, 740, 743, 764, 763, 767, 802, 803, 804, 830, 834, 863, 864, 881, 893]
 
+TRUMP_INDS = [891, 893, 863, 834, 802, 804, 773, 764, 743, 740, 736, 713, 712, 706, 684, 683, 653, 616, 593, 563, 556, 536, 465, 439, 405, 375, 354, 334, 323, 293, 294, 291, 264, 263, 234, 233, 225, 203, 204, 195, 173, 148, 118, 114, 107, 106, 90, 86, 73, 54, 47, 42, 33, 21]
+
 def main(args):
     emojis = load_emojis(args.emojifile, upsample=args.unit_upsample)
     emojis = [e for i,e in enumerate(emojis) if i in TRUMP_INDS]
@@ -161,7 +163,7 @@ if __name__ == '__main__':
     parser.add_argument('--unit_upsample', type=int, default=1)
     parser.add_argument('--log_every', type=int, default=50)
     parser.add_argument('--save_every', type=int, default=100)
-    parser.add_argument('--outdir', type=str, default='logs')
+    parser.add_argument('--outdir', type=str, default='.')
     args = parser.parse_args()
 
     if args.is_gif:
