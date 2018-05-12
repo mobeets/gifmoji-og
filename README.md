@@ -38,7 +38,9 @@ To process a .gif into a series of .png made of emojis, you can run something li
 python gifmoji.py emoji-trump --targetfile trump.gif --is_gif --force_add --outdir images/trump --target_upsample 4
 ```
 
-This will output a series of .png files named `emoji-trump-*.png`, where `*` will be 0, 1, 2, etc.
+This will output a series of .png files named `emoji-trump-*.png`, where `*` will be 0, 1, 2, etc. This will take some time to run!
+
+__If you want a super fast version (seconds rather than minutes), with emojis on a fixed and non-overlapping grid, add `--do_fast`.__
 
 You can then run the following (using [ImageMagick](https://www.imagemagick.org/script/index.php)) to combine the .pngs into a single .gif:
 ```
