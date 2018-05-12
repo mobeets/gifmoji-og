@@ -8,9 +8,15 @@ The "best" emoji is chosen based on Euclidean distance in pixel space. For examp
 
 (If you squint, you can see more detail of the original image.)
 
-<img src="https://media.giphy.com/media/ZylyPiu6Zhrqy0mhnE/giphy.gif" width="400px"></img><br>
+![trump](examples/trump.gif)
+
+![doge](examples/doge.gif)
+
+![kaleidoscope](examples/kaleidoscope.gif)
+
+<!--<img src="https://media.giphy.com/media/ZylyPiu6Zhrqy0mhnE/giphy.gif" width="400px"></img><br>
 <img src="https://media.giphy.com/media/SGVjSCEAzrgVlslV21/giphy.gif" width="400px"></img><br>
-<img src="https://media.giphy.com/media/wHYCPnVLcoRu9hRCbN/giphy.gif" width="400px"></img>
+<img src="https://media.giphy.com/media/wHYCPnVLcoRu9hRCbN/giphy.gif" width="400px"></img>-->
 
 ## Requirements
 
