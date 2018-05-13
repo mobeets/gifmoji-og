@@ -5,7 +5,8 @@ from skimage.util.shape import view_as_blocks
 from scipy.misc import imread
 from PIL import Image
 from scipy.spatial import distance
-EMOJI_SIZE = 32
+# EMOJI_SIZE = 32
+EMOJI_SIZE = 30
 
 def array_to_Image(img):
     return Image.fromarray(np.swapaxes(img, 0, 1))
@@ -23,15 +24,20 @@ def Image_rgba_to_rgb(image, color=(255, 255, 255)):
     """
     image.load() # needed for split()
     background = Image.new('RGB', image.size, color)
-    background.paste(image, mask=image.split()[3])  # 3 is the alpha channel
+    # note: 3 is the alpha channel
+    background.paste(image, mask=image.split()[3])
     return background
 
 def load_emojis(infile='images/emojis.png', upsample=1.0):
+    """
+    note: loads as 32x32, then shrinks to ignore white edge
+    """
     img = imread(infile, mode='RGBA')
-    B = view_as_blocks(img, block_shape=(EMOJI_SIZE, EMOJI_SIZE, 4))
+    B = view_as_blocks(img, block_shape=(EMOJI_SIZE+2, EMOJI_SIZE+2, 4))
     B = B[:,:,0,:,:,:]
-    C = np.reshape(B, (B.shape[0]*B.shape[1], EMOJI_SIZE, EMOJI_SIZE, 4))
-    return [Image.fromarray(c).resize((int(upsample*c.shape[0]), int(upsample*c.shape[1]))) for c in C]
+    C = np.reshape(B, (B.shape[0]*B.shape[1], EMOJI_SIZE+2, EMOJI_SIZE+2, 4))
+    shrink = lambda c: c[1:-1,1:-1,:]
+    return [Image.fromarray(shrink(c)).resize((int(upsample*c.shape[0]), int(upsample*c.shape[1]))) for c in C]
 
 def load_target(infile='images/trump.png', upsample=1.0):
     img = Image.open(infile).convert('RGB')
@@ -95,10 +101,9 @@ def emoji_encode(img):
     Yc = 1.0*np.array(Image_rgba_to_rgb(img))
     return np.reshape(Yc, (EMOJI_SIZE*EMOJI_SIZE, -1)).mean(axis=0)
 
-def main_fast(args):
+def main_quick(args):
     """
     if we just want a perfect grid of emojis, we can use this
-
     here, we just compare based on average color of each block
     """
     # load target image, extract segments of image
@@ -130,6 +135,7 @@ def main_fast(args):
 
     # combine emojis to create final image
     E = emojis[indsb]
+    # the next lines are basically the reverse of view_as_blocks
     E = E.transpose(0,1,3,4,2)
     Es = [E[:,:,:,:,i] for i in range(3)]
     Es2 = [B.transpose(0,2,1,3).reshape(-1,B.shape[1]*B.shape[3]) for B in Es]
@@ -137,9 +143,13 @@ def main_fast(args):
     img = Image.fromarray(E2, 'RGB')
 
     # save image
-    outfile = os.path.join(args.outdir, args.run_name + '.png')
+    outfile = os.path.join(args.outdir, args.run_name + '.' + args.extension)
     if not os.path.exists(args.outdir):
         os.mkdir(args.outdir)
+
+    if args.tiny:
+        sz = (img.size[0]/args.target_upsample, img.size[1]/args.target_upsample)
+        img.thumbnail(sz, Image.ANTIALIAS)
     img.save(outfile)
 
 def main(args):
@@ -157,7 +167,7 @@ def main(args):
     # find layer response to each 32x32 emoji
     emoji_blocks = [encode(img) for img in emojis]
     
-    outfile = os.path.join(args.outdir, args.run_name + '.png')
+    outfile = os.path.join(args.outdir, args.run_name + '.' + args.extension)
     if not os.path.exists(args.outdir):
         os.mkdir(args.outdir)
 
@@ -191,9 +201,17 @@ def main(args):
                 print("Iter #{}, Emoji #{}, Score: {:0.2f}".format(i, np.nan, null_score))
         if i % args.save_every == 0:
             Yh.save(outfile)
+    if args.tiny:
+        sz = (Yh.size[0]/args.target_upsample, Yh.size[1]/args.target_upsample)
+        Yh.thumbnail(sz, Image.ANTIALIAS)
     Yh.save(outfile)
 
 if __name__ == '__main__':
+    """
+    to do:
+    - clean up main version, to just do color,
+        and not render until very end?
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('run_name', type=str,
         help='tag for current run')
@@ -203,7 +221,9 @@ if __name__ == '__main__':
         default='images/emojis.png')
     parser.add_argument('--force_add', action='store_true')
     parser.add_argument('--no_grid', action='store_true')
-    parser.add_argument('--do_fast', action='store_true')
+    parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--tiny', action='store_true',
+        help="save tiny image, by undoing target_upsample at the end")
     parser.add_argument('--silent', action='store_true')
     parser.add_argument('--gif_partial_mode', action='store_true',
         help="set if gif is in partial mode")
@@ -218,6 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_every', type=int, default=50)
     parser.add_argument('--save_every', type=int, default=100)
     parser.add_argument('--outdir', type=str, default='.')
+    parser.add_argument('--extension', type=str, default='png')
     args = parser.parse_args()
 
     if args.is_gif:
@@ -231,14 +252,14 @@ if __name__ == '__main__':
             args.targetfile = outfile
             args.run_name = run_name + '-{:02d}'.format(i)
             print(args.targetfile, args.run_name)
-            if args.do_fast:
-                main_fast(args)
+            if args.quick:
+                main_quick(args)
             else:
                 main(args)
         # now, combine .pngs into a single .gif:
         # convert -dispose previous -delay 1 *.png out.gif
     else:
-        if args.do_fast:
-            main_fast(args)
+        if args.quick:
+            main_quick(args)
         else:
             main(args)

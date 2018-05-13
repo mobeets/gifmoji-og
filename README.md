@@ -40,7 +40,7 @@ python gifmoji.py emoji-trump --targetfile trump.gif --is_gif --force_add --outd
 
 This will output a series of .png files named `emoji-trump-*.png`, where `*` will be 0, 1, 2, etc. This will take some time to run!
 
-__If you want a super fast version (seconds rather than minutes), with emojis on a fixed and non-overlapping grid, add `--do_fast`.__
+__If you want a super fast version (seconds rather than minutes), with emojis on a fixed and non-overlapping grid, add `--quick`.__
 
 You can then run the following (using [ImageMagick](https://www.imagemagick.org/script/index.php)) to combine the .pngs into a single .gif:
 ```
