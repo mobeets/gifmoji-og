@@ -28,7 +28,7 @@ def Image_rgba_to_rgb(image, color=(255, 255, 255)):
     background.paste(image, mask=image.split()[3])
     return background
 
-def load_emojis(infile='images/emojis.png', upsample=1.0):
+def load_emojis(infile='images/emojis.png', upsample=1.0, n_to_trim=1):
     """
     note: loads as 32x32, then shrinks to ignore white edge
     """
@@ -36,7 +36,11 @@ def load_emojis(infile='images/emojis.png', upsample=1.0):
     B = view_as_blocks(img, block_shape=(EMOJI_SIZE+2, EMOJI_SIZE+2, 4))
     B = B[:,:,0,:,:,:]
     C = np.reshape(B, (B.shape[0]*B.shape[1], EMOJI_SIZE+2, EMOJI_SIZE+2, 4))
-    shrink = lambda c: c[1:-1,1:-1,:]
+    if n_to_trim > 0:
+        # e.g., n_to_trim = 1 -> 30x30, n_to_trim = 2 -> 28x28
+        shrink = lambda c: c[n_to_trim:-n_to_trim,n_to_trim:-n_to_trim,:]
+    else:
+        shrink = lambda c: c
     return [Image.fromarray(shrink(c)).resize((int(upsample*c.shape[0]), int(upsample*c.shape[1]))) for c in C]
 
 def load_target(infile='images/trump.png', upsample=1.0):
@@ -101,8 +105,8 @@ def rescore(Y, Yc):
 #     Yc = 1.0*np.array(Image_rgba_to_rgb(img))
 #     return np.reshape(Yc, (EMOJI_SIZE*EMOJI_SIZE, -1)).mean(axis=0)
 
-def get_emojis_and_clrs(emojifile, upsample=1):
-    emojis = load_emojis(emojifile, upsample=upsample)
+def get_emojis_and_clrs(emojifile, upsample=1, n_to_trim=1):
+    emojis = load_emojis(emojifile, upsample=upsample, n_to_trim=n_to_trim)
     emojis = [1.0*np.array(Image_rgba_to_rgb(img)) for img in emojis]
     emojis = np.array(emojis)
     emojis = emojis.transpose(0,-1,1,2)
@@ -142,7 +146,7 @@ def main_quick(args):
     clrs, shape = get_image_block_clrs(Y, (EMOJI_SIZE,EMOJI_SIZE,3))
 
     # load emojis, and find mean color of each emoji
-    emojis, eclrs = get_emojis_and_clrs(args.emojifile, args.unit_upsample)
+    emojis, eclrs = get_emojis_and_clrs(args.emojifile, args.unit_upsample, args.n_to_trim)
 
     # find closest emoji in terms of color
     dists = distance.cdist(clrs, eclrs, 'euclidean')
@@ -164,7 +168,7 @@ def main_quick(args):
     img.save(outfile)
 
 def main(args):
-    emojis = load_emojis(args.emojifile, upsample=args.unit_upsample)
+    emojis = load_emojis(args.emojifile, upsample=args.unit_upsample, n_to_trim=args.n_to_trim)
 
     sx, sy = emojis[0].size
     if not args.silent:
@@ -243,6 +247,8 @@ if __name__ == '__main__':
     parser.add_argument('--unit_upsample', type=int, default=1)
     parser.add_argument('--log_every', type=int, default=50)
     parser.add_argument('--save_every', type=int, default=100)
+    parser.add_argument('--n_to_trim', type=int, default=1,
+        help="e.g., 1 -> emojis are 30x30 instead of 32x32")
     parser.add_argument('--outdir', type=str, default='.')
     parser.add_argument('--extension', type=str, default='png')
     args = parser.parse_args()

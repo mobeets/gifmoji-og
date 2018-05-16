@@ -33,7 +33,7 @@ def process_face((x,y,h,w), facelayer, emojis, eclrs):
     nw = ew*int(w/ew)
     nh = eh*int(h/eh)
     curface = facelayer[y:(y+nh),x:(x+nw),:]
-    if len(curface) == 0:
+    if len(curface) == 0 or curface.shape[0]*curface.shape[1] == 0:
         return facelayer
 
     # get avg color in each block of curface
@@ -51,8 +51,16 @@ def process_face((x,y,h,w), facelayer, emojis, eclrs):
     facelayer[y:(y+nh),x:(x+nw),:] = img
     return facelayer
 
+def get_frame(vs, args):
+    frame = vs.read()
+    width = frame.shape[1]
+    height = frame.shape[0]
+    frame = frame[args.trim_height:height-args.trim_height:, args.trim_width:width-args.trim_width,:]
+    frame = resize(frame, width=args.width)
+    return frame
+
 def main(args):
-    emojis, eclrs = get_emojis_and_clrs('images/emojis.png', args.emoji_scale)
+    emojis, eclrs = get_emojis_and_clrs(args.emojifile, args.emoji_scale, args.n_to_trim)
 
     vs = VideoStream().start()
     time.sleep(1.5)
@@ -67,8 +75,7 @@ def main(args):
 
     # get our first frame outside of loop, so we can see how our
     # webcame resized itself, and it's resolution w/ np.shape
-    frame = vs.read()
-    frame = resize(frame, width=args.width)
+    frame = get_frame(vs, args)
 
     facelayer = np.zeros(frame.shape, dtype='uint8')
     facemask = facelayer.copy()
@@ -78,8 +85,7 @@ def main(args):
 
     while True:
         # read a frame from webcam, resize to be smaller
-        frame = vs.read()
-        frame = resize(frame, width=args.width)
+        frame = get_frame(vs, args)
 
         # fill our masks and frames with 0 (black) on every draw loop
         facelayer.fill(0)
@@ -98,6 +104,7 @@ def main(args):
                 # draw bounding box around face
                 x,y,w,h = face_utils.rect_to_bb(rect)
                 # cv2.rectangle(frame, (x,y), (x+w, y+h), (255, 0, 128), 2)
+                # frame = process_face((x,y,w,h), frame, emojis, eclrs)
 
                 # get face mask
                 faceBox = np.array([[x, y], [x+w, y], [x+w, y+h], [x, y+h]])
@@ -145,9 +152,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--outdir", default="movies",
         help="path to save pngs from movie")
-    parser.add_argument("--width", type=int, default=800,
+    parser.add_argument("--width", type=int, default=1000,
         help="size of screen")
+    parser.add_argument("--trim_width", type=int, default=200,
+        help="size of screen on sides to trim")
+    parser.add_argument("--trim_height", type=int, default=100,
+        help="size of screen on top/bottom to trim")
     parser.add_argument("--emoji_scale", type=float, default=0.5,
         help="scale of 1.0 means (32x32) emojis")
+    parser.add_argument('--n_to_trim', type=int, default=1,
+        help="e.g., 1 -> emojis are 30x30 instead of 32x32")
+    parser.add_argument('--emojifile', type=str,
+        default='images/emojis.png')
     args = parser.parse_args()
     main(args)
