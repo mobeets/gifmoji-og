@@ -97,50 +97,61 @@ def rescore(Y, Yc):
 # TRUMP_INDS = [891, 893, 863, 834, 802, 804, 773, 764, 743, 740, 736, 713, 712, 706, 684, 683, 653, 616, 593, 563, 556, 536, 465, 439, 405, 375, 354, 334, 323, 293, 294, 291, 264, 263, 234, 233, 225, 203, 204, 195, 173, 148, 118, 114, 107, 106, 90, 86, 73, 54, 47, 42, 33, 21]
 # emojis = [e for i,e in enumerate(emojis) if i in TRUMP_INDS]
 
-def emoji_encode(img):
-    Yc = 1.0*np.array(Image_rgba_to_rgb(img))
-    return np.reshape(Yc, (EMOJI_SIZE*EMOJI_SIZE, -1)).mean(axis=0)
+# def emoji_encode(img):
+#     Yc = 1.0*np.array(Image_rgba_to_rgb(img))
+#     return np.reshape(Yc, (EMOJI_SIZE*EMOJI_SIZE, -1)).mean(axis=0)
+
+def get_emojis_and_clrs(emojifile, upsample=1):
+    emojis = load_emojis(emojifile, upsample=upsample)
+    emojis = [1.0*np.array(Image_rgba_to_rgb(img)) for img in emojis]
+    emojis = np.array(emojis)
+    emojis = emojis.transpose(0,-1,1,2)
+    eclrs = np.reshape(emojis, emojis.shape[:2] + (-1,))
+    eclrs = np.mean(eclrs, axis=-1)
+    return emojis, eclrs
+
+def emoji_inds_to_img(E):
+    # the next lines are basically the reverse of view_as_blocks
+    E = E.transpose(0,1,3,4,2)
+    Es = [E[:,:,:,:,i] for i in range(3)]
+    Es2 = [B.transpose(0,2,1,3).reshape(-1,B.shape[1]*B.shape[3]) for B in Es]
+    E2 = np.dstack(Es2).astype(np.uint8)
+    return E2
+
+def get_image_block_clrs(Y, block_shape):
+    Ys = view_as_blocks(Y, block_shape=block_shape)
+    pts = Ys[:,:,0,:,:,:]
+    pts = pts.transpose(0,1,-1,2,3)
+    pts = np.reshape(pts, pts.shape[:-2] + (-1,))
+    clrs = np.mean(pts, axis=-1) # w x h x 3
+    clrs = np.reshape(clrs.transpose(-1,0,1), (3, -1)).T # w*h x 3
+    return clrs, pts.shape
 
 def main_quick(args):
     """
     if we just want a perfect grid of emojis, we can use this
     here, we just compare based on average color of each block
     """
-    # load target image, extract segments of image
+    # load target image and make divisible by emoji size
     Y = load_target(args.targetfile, upsample=args.target_upsample)
     wx = EMOJI_SIZE*(Y.shape[0]/EMOJI_SIZE)
     wy = EMOJI_SIZE*(Y.shape[1]/EMOJI_SIZE)
     Y = Y[:wx,:wy,:].transpose(1,0,2)
-    Ys = view_as_blocks(Y, block_shape=(EMOJI_SIZE,EMOJI_SIZE,3))
 
-    # find mean color of each block
-    pts = Ys[:,:,0,:,:,:]
-    pts = pts.transpose(0,1,-1,2,3)
-    pts = np.reshape(pts, pts.shape[:-2] + (-1,))
-    clrs = np.mean(pts, axis=-1) # w x h x 3
-    clrs = np.reshape(clrs.transpose(-1,0,1), (3, -1)).T # w*h x 3
+    # find mean color of each image block
+    clrs, shape = get_image_block_clrs(Y, (EMOJI_SIZE,EMOJI_SIZE,3))
 
     # load emojis, and find mean color of each emoji
-    emojis = load_emojis(args.emojifile, upsample=args.unit_upsample)
-    emojis = [1.0*np.array(Image_rgba_to_rgb(img)) for img in emojis]
-    emojis = np.array(emojis)
-    emojis = emojis.transpose(0,-1,1,2)
-    eclrs = np.reshape(emojis, emojis.shape[:2] + (-1,))
-    eclrs = np.mean(eclrs, axis=-1)
+    emojis, eclrs = get_emojis_and_clrs(args.emojifile, args.unit_upsample)
 
     # find closest emoji in terms of color
     dists = distance.cdist(clrs, eclrs, 'euclidean')
     inds = np.argmin(dists, axis=-1)
-    indsb = inds.reshape(pts.shape[0], pts.shape[1])
+    indsb = inds.reshape(shape[0], shape[1])
 
     # combine emojis to create final image
-    E = emojis[indsb]
-    # the next lines are basically the reverse of view_as_blocks
-    E = E.transpose(0,1,3,4,2)
-    Es = [E[:,:,:,:,i] for i in range(3)]
-    Es2 = [B.transpose(0,2,1,3).reshape(-1,B.shape[1]*B.shape[3]) for B in Es]
-    E2 = np.dstack(Es2).astype(np.uint8)
-    img = Image.fromarray(E2, 'RGB')
+    img = emoji_inds_to_img(emojis[indsb])
+    img = Image.fromarray(img, 'RGB')
 
     # save image
     outfile = os.path.join(args.outdir, args.run_name + '.' + args.extension)
@@ -207,11 +218,6 @@ def main(args):
     Yh.save(outfile)
 
 if __name__ == '__main__':
-    """
-    to do:
-    - clean up main version, to just do color,
-        and not render until very end?
-    """
     parser = argparse.ArgumentParser()
     parser.add_argument('run_name', type=str,
         help='tag for current run')
@@ -240,6 +246,7 @@ if __name__ == '__main__':
     parser.add_argument('--outdir', type=str, default='.')
     parser.add_argument('--extension', type=str, default='png')
     args = parser.parse_args()
+    # is_quick = args.sigma > 0 and args.no_grid
 
     if args.is_gif:
         from gifextract import processImage
